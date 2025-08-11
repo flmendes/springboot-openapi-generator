@@ -2,6 +2,7 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.5.4'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.openapi.generator' version '7.14.0'
 }
 
 group = 'com.example'
@@ -37,7 +38,7 @@ tasks.named('test') {
 // OpenAPI Generator configuration
 openApiGenerate {
     generatorName = 'spring'
-    inputSpec = "${projectDir}/src/main/resources/swagger/openapi.yaml"
+    inputSpec = "${projectDir}/src/main/resources/openapi/student.yml"
     outputDir = "${buildDir}/generated"
     apiPackage = 'org.swagger.api'
     modelPackage = 'org.swagger.model'
