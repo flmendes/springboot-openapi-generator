@@ -13,13 +13,8 @@ public class StudentService {
     private final Map<String, Student> students = new ConcurrentHashMap<>();
 
     public StudentResponse createStudent(StudentRequest request) {
-        // Check if email already exists
-        boolean emailExists = students
-            .values()
-            .stream()
-            .anyMatch(student -> student.email().equals(request.email()));
 
-        if (emailExists) {
+        if (emailExists(request.email())) {
             throw new IllegalArgumentException("Email already exists");
         }
 
@@ -37,7 +32,7 @@ public class StudentService {
         return students.size();
     }
 
-    public boolean emailExists(String email) {
+    private boolean emailExists(String email) {
         return students
             .values()
             .stream()
