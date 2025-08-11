@@ -1,0 +1,69 @@
+openapi: 3.0.3
+info:
+  title: Students API
+  description: API for student registration
+  version: 1.0.0
+
+servers:
+  - url: https://api.example.com/v1
+    description: Main Server
+
+paths:
+  /students:
+    post:
+      summary: Create student
+      description: Creates a new student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentRequest"
+            example:
+              name: "John Doe"
+              email: "john.doe@email.com"
+              phone: "(11) 99999-9999"
+      responses:
+        "201":
+          description: Student created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentResponse"
+        "400":
+          description: Invalid data
+        "409":
+          description: Email already exists
+
+components:
+  schemas:
+    StudentRequest:
+      type: object
+      required:
+        - name
+        - email
+        - phone
+      properties:
+        name:
+          type: string
+          description: Student name
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          description: Student email
+          example: "john.doe@email.com"
+        phone:
+          type: string
+          description: Student phone
+          example: "(11) 99999-9999"
+
+    StudentResponse:
+      allOf:
+        - $ref: "#/components/schemas/Student"
+        - type: object
+          properties:
+            id:
+              type: string
+              description: Student ID
+              example: "create uuid-v4"
