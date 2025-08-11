@@ -1,0 +1,49 @@
+{
+  "name": "Java 21 Development",
+  "image": "mcr.microsoft.com/devcontainers/java:21-jdk-bookworm",
+
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "jdkDistro": "ms"
+    },
+    "ghcr.io/devcontainers/features/gradle:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/maven:1": {
+      "version": "latest"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "redhat.java",
+        "redhat.vscode-java-debug",
+        "redhat.vscode-java-test",
+        "redhat.vscode-java-dependency",
+        "redhat.vscode-xml",
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-gradle",
+        "vscjava.vscode-maven"
+      ],
+      "settings": {
+        "java.configuration.runtimes": [
+          {
+            "name": "JavaSE-21",
+            "path": "/usr/local/sdkman/candidates/java/current"
+          }
+        ],
+        "java.compile.nullAnalysis.mode": "automatic",
+        "java.configuration.detectJdksAtStart": false,
+        "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx2G -Xms100m"
+      }
+    }
+  },
+
+  "forwardPorts": [8080, 3000, 5005],
+
+  "postCreateCommand": "java -version && gradle --version && mvn --version",
+
+  "remoteUser": "vscode"
+}
