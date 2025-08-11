@@ -74,6 +74,7 @@
 							<modelPackage>com.example.students.model</modelPackage>
 							<configOptions>
 								<interfaceOnly>true</interfaceOnly>
+                                <useSpringBoot3>true</useSpringBoot3>
 							</configOptions>
 						</configuration>
 					</execution>
