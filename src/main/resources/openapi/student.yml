@@ -60,7 +60,7 @@ components:
 
     StudentResponse:
       allOf:
-        - $ref: "#/components/schemas/Student"
+        - $ref: "#/components/schemas/StudentRequest"
         - type: object
           properties:
             id:

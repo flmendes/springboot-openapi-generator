@@ -42,7 +42,8 @@ openApiGenerate {
     apiPackage = 'org.swagger.api'
     modelPackage = 'org.swagger.model'
     configOptions = [
-        interfaceOnly: 'true'
+        interfaceOnly: 'true',
+        useSpringBoot3: 'true'
     ]
 }
 

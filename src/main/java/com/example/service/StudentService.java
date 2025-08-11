@@ -1,11 +1,11 @@
 package com.example.service;
 
-import com.example.dto.StudentRequest;
-import com.example.dto.StudentResponse;
 import com.example.model.Student;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
+import org.swagger.model.StudentRequest;
+import org.swagger.model.StudentResponse;
 
 @Service
 public class StudentService {
@@ -14,18 +14,27 @@ public class StudentService {
 
     public StudentResponse createStudent(StudentRequest request) {
 
-        if (emailExists(request.email())) {
+        if (emailExists(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists");
         }
 
         // Create new student using factory method
-        Student student = Student.create(request.name(), request.email(), request.phone());
+        Student student = Student.create(request.getName(), request.getEmail(), request.getPhone());
 
         // Save to memory
         students.put(student.id(), student);
 
         // Return response using factory method
-        return StudentResponse.fromStudent(student);
+        return toStudentResponse(student);
+    }
+
+    private StudentResponse toStudentResponse(Student student) {
+        var response = new StudentResponse();
+        response.setId(student.id());
+        response.setName(student.name());
+        response.setEmail(student.email());
+        response.setPhone(student.phone());
+        return response;
     }
 
     public int getStudentCount() {
