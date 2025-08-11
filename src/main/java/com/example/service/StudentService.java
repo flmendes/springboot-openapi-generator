@@ -3,9 +3,11 @@ package com.example.service;
 import com.example.model.Student;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.example.students.model.StudentRequest;
+import com.example.students.model.StudentResponse;
 import org.springframework.stereotype.Service;
-import org.swagger.model.StudentRequest;
-import org.swagger.model.StudentResponse;
+
 
 @Service
 public class StudentService {

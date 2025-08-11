@@ -39,8 +39,8 @@ openApiGenerate {
     generatorName = 'spring'
     inputSpec = "${projectDir}/src/main/resources/openapi/student.yml"
     outputDir = "${buildDir}/generated"
-    apiPackage = 'org.swagger.api'
-    modelPackage = 'org.swagger.model'
+    apiPackage = 'com.example.students.api'
+    modelPackage = 'com.example.students.model'
     configOptions = [
         interfaceOnly: 'true',
         useSpringBoot3: 'true'
