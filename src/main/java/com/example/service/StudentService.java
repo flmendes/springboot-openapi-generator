@@ -1,5 +1,6 @@
 package com.example.service;
 
+import com.example.exception.EmailAlreadyExistsException;
 import com.example.model.Student;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,7 +18,7 @@ public class StudentService {
     public StudentResponse createStudent(StudentRequest request) {
 
         if (emailExists(request.getEmail())) {
-            throw new IllegalArgumentException("Email already exists");
+            throw new EmailAlreadyExistsException("Email already exists");
         }
 
         // Create new student using factory method
