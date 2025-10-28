@@ -16,8 +16,8 @@
 
 	<properties>
 		<java.version>21</java.version>
-		<maven.compiler.source>21</maven.compiler.source>
-    	<maven.compiler.target>21</maven.compiler.target>
+		<BP_SPRING_AOT_ENABLED>false</BP_SPRING_AOT_ENABLED>
+        <BP_JVM_CDS_ENABLED>false</BP_JVM_CDS_ENABLED>
 	</properties>
 
 	<dependencies>
@@ -59,6 +59,23 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>process-aot</id>
+                        <goals>
+                            <goal>process-aot</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <image>
+                        <env>
+                            <BP_SPRING_AOT_ENABLED>${BP_SPRING_AOT_ENABLED}</BP_SPRING_AOT_ENABLED>
+                            <BP_JVM_CDS_ENABLED>${BP_JVM_CDS_ENABLED}</BP_JVM_CDS_ENABLED>
+                            <BP_JVM_VERSION>${java.version}</BP_JVM_VERSION>
+                        </env>
+                    </image>
+                </configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.openapitools</groupId>

@@ -8,11 +8,18 @@ plugins {
 group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 
+ext {
+    BP_SPRING_AOT_ENABLED = 'false'
+    BP_JVM_CDS_ENABLED = 'false'
+}
+
+
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)
 	}
 }
+
 
 repositories {
 	mavenCentral()
@@ -57,4 +64,18 @@ sourceSets {
     }
 }
 
+
 compileJava.dependsOn tasks.openApiGenerate
+
+
+tasks.bootBuildImage {
+    environment = [
+            BP_SPRING_AOT_ENABLED : BP_SPRING_AOT_ENABLED,
+            BP_JVM_CDS_ENABLED    : BP_JVM_CDS_ENABLED,
+            BP_JVM_VERSION        : JavaVersion.VERSION_21
+    ]
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
