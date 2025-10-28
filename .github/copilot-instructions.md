@@ -1,6 +1,6 @@
 # Spring Boot OpenAPI Generator Project
 
-Spring Boot 3.5.4 application demonstrating OpenAPI Generator usage for generating API interfaces and models from OpenAPI specification. The project includes a simple Student Registration API with in-memory storage and comprehensive API documentation.
+Spring Boot 3.5.7 application demonstrating OpenAPI Generator usage for generating API interfaces and models from OpenAPI specification. The project includes a simple Student Registration API with in-memory storage and comprehensive API documentation.
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
