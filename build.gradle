@@ -11,6 +11,7 @@ version = '0.0.1-SNAPSHOT'
 ext {
     BP_SPRING_AOT_ENABLED = 'false'
     BP_JVM_CDS_ENABLED = 'false'
+    BP_JVM_VERSION = '21'
 }
 
 
@@ -72,7 +73,7 @@ tasks.bootBuildImage {
     environment = [
             BP_SPRING_AOT_ENABLED : BP_SPRING_AOT_ENABLED,
             BP_JVM_CDS_ENABLED    : BP_JVM_CDS_ENABLED,
-            BP_JVM_VERSION        : JavaVersion.VERSION_21
+            BP_JVM_VERSION        : BP_JVM_VERSION
     ]
 }
 
