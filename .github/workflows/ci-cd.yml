@@ -188,10 +188,129 @@ jobs:
             echo "- \`docker pull ${tag}\`" >> $GITHUB_STEP_SUMMARY
           done
 
+  build-and-push-native-image:
+    name: Build and Push Native Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Native Docker
+        id: meta-native
+        run: |
+          # Determine image tags based on branch/event with -native suffix
+          IMAGE_BASE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          TAGS=""
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TAGS="${IMAGE_BASE}:pr-${{ github.event.pull_request.number }}-native"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            TAGS="${IMAGE_BASE}:latest-native,${IMAGE_BASE}:main-native,${IMAGE_BASE}:main-${{ github.sha }}-native"
+          else
+            TAGS="${IMAGE_BASE}:${{ github.ref_name }}-native,${IMAGE_BASE}:${{ github.ref_name }}-${{ github.sha }}-native"
+          fi
+
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "Native image tags: ${TAGS}"
+
+      - name: Build Native Docker image with Spring Boot Buildpacks
+        run: |
+          # Get the first tag for building
+          PRIMARY_TAG=$(echo "${{ steps.meta-native.outputs.tags }}" | cut -d',' -f1)
+          echo "Building native image with tag: ${PRIMARY_TAG}"
+
+          # Build native image using Spring Boot Buildpacks with BP_NATIVE_IMAGE=true
+          ./mvnw spring-boot:build-image \
+            -Dspring-boot.build-image.imageName=${PRIMARY_TAG} \
+            -Dspring-boot.build-image.env.BP_NATIVE_IMAGE=true \
+            -DskipTests
+
+          # Tag with additional tags
+          IFS=',' read -ra TAGS_ARRAY <<< "${{ steps.meta-native.outputs.tags }}"
+          for tag in "${TAGS_ARRAY[@]:1}"; do
+            echo "Tagging native image: ${tag}"
+            docker tag ${PRIMARY_TAG} ${tag}
+          done
+
+      - name: Test Native Docker image
+        run: |
+          # Get the first tag from the metadata output
+          IMAGE_TAG=$(echo "${{ steps.meta-native.outputs.tags }}" | cut -d',' -f1)
+          echo "Testing native image: ${IMAGE_TAG}"
+
+          # Run container in detached mode
+          CONTAINER_ID=$(docker run -d -p 8081:8080 "${IMAGE_TAG}")
+          echo "Container ID: ${CONTAINER_ID}"
+
+          # Wait for application to start (native images start faster, but give it some time)
+          echo "Waiting for native application to start..."
+          for i in {1..30}; do
+            if curl -f -s http://localhost:8081/actuator/health > /dev/null 2>&1; then
+              echo "Native application is healthy!"
+              docker logs "${CONTAINER_ID}"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Native application failed to start within timeout"
+              docker logs "${CONTAINER_ID}"
+              docker stop "${CONTAINER_ID}"
+              docker rm "${CONTAINER_ID}"
+              exit 1
+            fi
+            echo "Attempt $i/30 - waiting..."
+            sleep 2
+          done
+
+          # Cleanup
+          docker stop "${CONTAINER_ID}"
+          docker rm "${CONTAINER_ID}"
+
+      - name: Push Native Docker images
+        if: github.event_name != 'pull_request'
+        run: |
+          # Push all native tags
+          IFS=',' read -ra TAGS_ARRAY <<< "${{ steps.meta-native.outputs.tags }}"
+          for tag in "${TAGS_ARRAY[@]}"; do
+            echo "Pushing native image: ${tag}"
+            docker push "${tag}"
+          done
+
+      - name: Generate native image summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "### Native Docker Images Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Built with Spring Boot Buildpacks + GraalVM Native Image" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          IFS=',' read -ra TAGS_ARRAY <<< "${{ steps.meta-native.outputs.tags }}"
+          for tag in "${TAGS_ARRAY[@]}"; do
+            echo "- \`docker pull ${tag}\`" >> $GITHUB_STEP_SUMMARY
+          done
+
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [test, build, build-and-push-image]
+    needs: [test, build, build-and-push-image, build-and-push-native-image]
     if: always()
 
     steps:
@@ -202,7 +321,8 @@ jobs:
           echo "### Job Results" >> $GITHUB_STEP_SUMMARY
           echo "- Test: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Build: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Build & Push Image: ${{ needs.build-and-push-image.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build & Push Image (JVM): ${{ needs.build-and-push-image.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build & Push Image (Native): ${{ needs.build-and-push-native-image.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Build Information" >> $GITHUB_STEP_SUMMARY
           echo "- Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
@@ -212,8 +332,15 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "### Docker Image" >> $GITHUB_STEP_SUMMARY
-            echo "```" >> $GITHUB_STEP_SUMMARY
+            echo "### Docker Images" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**JVM Image:**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
             echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-            echo "```" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Native Image:**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-native" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           fi

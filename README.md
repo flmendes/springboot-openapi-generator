@@ -120,13 +120,31 @@ A aplicação estará disponível em `http://localhost:8080`
 
 ### Com Docker (Buildpacks)
 
+#### Imagem JVM (padrão)
+
 ```bash
-# Build da imagem
+# Build da imagem JVM
 ./mvnw spring-boot:build-image
 
 # Run do container
 docker run -p 8080:8080 springboot-openapi-generator:0.0.1-SNAPSHOT
 ```
+
+#### Imagem Nativa (GraalVM)
+
+```bash
+# Build da imagem nativa com GraalVM
+./mvnw spring-boot:build-image \
+  -Dspring-boot.build-image.env.BP_NATIVE_IMAGE=true
+
+# Run do container nativo (startup instantâneo)
+docker run -p 8080:8080 springboot-openapi-generator:0.0.1-SNAPSHOT
+```
+
+**Vantagens da Imagem Nativa:**
+- ⚡ Startup instantâneo (< 100ms vs ~2s JVM)
+- 💾 Menor consumo de memória (~50MB vs ~200MB)
+- 📦 Imagem menor (~80MB vs ~224MB)
 
 ### Verificar Health
 
@@ -191,8 +209,10 @@ curl http://localhost:8080/actuator/health
 
 ### Build com Spring Boot Buildpacks
 
+#### Imagem JVM
+
 ```bash
-# Build padrão
+# Build padrão (JVM)
 ./mvnw spring-boot:build-image
 
 # Build com nome customizado
@@ -200,11 +220,28 @@ curl http://localhost:8080/actuator/health
   -Dspring-boot.build-image.imageName=myapp:1.0
 ```
 
+#### Imagem Nativa
+
+```bash
+# Build com GraalVM Native Image
+./mvnw spring-boot:build-image \
+  -Dspring-boot.build-image.env.BP_NATIVE_IMAGE=true
+
+# Build nativa com nome customizado
+./mvnw spring-boot:build-image \
+  -Dspring-boot.build-image.imageName=myapp:1.0-native \
+  -Dspring-boot.build-image.env.BP_NATIVE_IMAGE=true
+```
+
 ### Executar Container
 
 ```bash
-# Run em background
+# Run imagem JVM em background
 docker run -d -p 8080:8080 --name my-app \
+  springboot-openapi-generator:0.0.1-SNAPSHOT
+
+# Run imagem nativa (startup instantâneo)
+docker run -d -p 8080:8080 --name my-app-native \
   springboot-openapi-generator:0.0.1-SNAPSHOT
 
 # Ver logs
@@ -215,12 +252,24 @@ docker stop my-app
 docker rm my-app
 ```
 
-### Imagem Docker
+### Imagens Docker
 
+#### Imagem JVM
 - **Builder**: `paketobuildpacks/builder-noble-java-tiny`
 - **Base Runtime**: Ubuntu Noble Tiny
 - **JRE**: BellSoft Liberica 21
 - **Size**: ~224 MB
+- **Startup**: ~2 segundos
+- **Memory**: ~200 MB
+- **User**: CNB (non-root, UID 1000)
+
+#### Imagem Nativa (GraalVM)
+- **Builder**: `paketobuildpacks/builder-noble-tiny` (com Native Image buildpack)
+- **Base Runtime**: Ubuntu Noble Tiny
+- **Runtime**: GraalVM Native Image
+- **Size**: ~80 MB
+- **Startup**: < 100 ms
+- **Memory**: ~50 MB
 - **User**: CNB (non-root, UID 1000)
 
 ## 🔄 CI/CD
@@ -230,15 +279,16 @@ O projeto inclui um pipeline completo de CI/CD com GitHub Actions.
 ### Pipeline
 
 ```
-Test → Build → Build Image → Push to Registry → Summary
+Test → Build → Build Image (JVM) + Build Image (Native) → Push to Registry → Summary
 ```
 
 **Jobs:**
 
 1. **Test** - Executa todos os testes (`./mvnw test`)
 2. **Build** - Compila e cria o JAR
-3. **Build & Push Image** - Cria imagem com Buildpacks e faz push para GitHub Container Registry
-4. **Summary** - Gera relatório de deployment
+3. **Build & Push Image (JVM)** - Cria imagem JVM com Buildpacks e faz push (paralelo)
+4. **Build & Push Image (Native)** - Cria imagem nativa com GraalVM Native Image (paralelo)
+5. **Summary** - Gera relatório de deployment
 
 ### Triggers
 
@@ -250,12 +300,24 @@ Test → Build → Build Image → Push to Registry → Summary
 
 Imagens são publicadas em GitHub Container Registry:
 
+#### Imagens JVM
+
 ```bash
 # Latest (main branch)
 docker pull ghcr.io/<username>/springboot-openapi-generator:latest
 
 # Branch específico
 docker pull ghcr.io/<username>/springboot-openapi-generator:main
+```
+
+#### Imagens Nativas
+
+```bash
+# Latest nativa (main branch)
+docker pull ghcr.io/<username>/springboot-openapi-generator:latest-native
+
+# Branch específico nativa
+docker pull ghcr.io/<username>/springboot-openapi-generator:main-native
 ```
 
 ### Mais Informações

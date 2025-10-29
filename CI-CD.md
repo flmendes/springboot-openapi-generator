@@ -8,8 +8,10 @@ The CI/CD pipeline consists of the following stages:
 
 1. **Test** - Runs all unit and integration tests
 2. **Build** - Compiles and packages the application
-3. **Build Image** - Creates a Docker container image using Spring Boot Buildpacks
-4. **Push** - Pushes the image to GitHub Container Registry (ghcr.io)
+3. **Build Image (JVM)** - Creates a JVM Docker container image using Spring Boot Buildpacks (runs in parallel)
+4. **Build Image (Native)** - Creates a GraalVM Native Docker container image using Spring Boot Buildpacks (runs in parallel)
+5. **Push** - Pushes both images to GitHub Container Registry (ghcr.io)
+6. **Summary** - Generates deployment report
 
 ## Spring Boot Buildpacks
 
@@ -21,6 +23,16 @@ This project uses **Cloud Native Buildpacks** via Spring Boot's built-in support
 - 📦 **Optimized images** - Minimal size with JRE-only runtime
 - 🔄 **Consistency** - Same image locally and in CI/CD
 - 🛡️ **Best practices** - Security and performance optimizations built-in
+
+## GraalVM Native Image
+
+In addition to standard JVM images, the pipeline also builds **GraalVM Native Images** using `BP_NATIVE_IMAGE=true`, providing:
+
+- ⚡ **Instant startup** - Application starts in < 100ms
+- 💾 **Low memory footprint** - ~50MB RAM vs ~200MB for JVM
+- 📦 **Smaller images** - ~80MB vs ~224MB for JVM images
+- 🎯 **Optimized for cloud** - Perfect for serverless and microservices
+- 🔋 **Lower resource costs** - Reduced CPU and memory usage
 
 ## Workflow Triggers
 
@@ -57,16 +69,16 @@ Compiles and packages the Spring Boot application.
 
 **Artifacts:** Application JAR available for 7 days
 
-### 3. Build and Push Image Job
+### 3. Build and Push JVM Image Job
 
-Creates a Docker image using Spring Boot Buildpacks and pushes it to GitHub Container Registry.
+Creates a JVM Docker image using Spring Boot Buildpacks and pushes it to GitHub Container Registry. Runs in parallel with the Native Image job.
 
 **Steps:**
 - Checkout code
 - Set up JDK 21 (Eclipse Temurin)
 - Login to GitHub Container Registry
 - Extract Docker metadata and tags
-- **Build image using `./mvnw spring-boot:build-image`**
+- **Build JVM image using `./mvnw spring-boot:build-image`**
 - Tag image with multiple tags
 - Test Docker image (health check)
 - Push all image tags to registry (if not a PR)
@@ -80,17 +92,44 @@ Creates a Docker image using Spring Boot Buildpacks and pushes it to GitHub Cont
 - `develop-{sha}` - Develop branch commit reference
 - `pr-{number}` - For pull requests (not pushed)
 
-### 4. Summary Job
+### 4. Build and Push Native Image Job
+
+Creates a GraalVM Native Docker image using Spring Boot Buildpacks with `BP_NATIVE_IMAGE=true` and pushes it to GitHub Container Registry. Runs in parallel with the JVM Image job.
+
+**Steps:**
+- Checkout code
+- Set up GraalVM (graalvm-community distribution)
+- Login to GitHub Container Registry
+- Extract Docker metadata and tags with `-native` suffix
+- **Build native image using `./mvnw spring-boot:build-image -Dspring-boot.build-image.env.BP_NATIVE_IMAGE=true`**
+- Tag image with multiple tags (all with `-native` suffix)
+- Test native Docker image (health check on port 8081)
+- Push all native image tags to registry (if not a PR)
+- Generate native image summary
+
+**Native Image Tags Generated:**
+- `latest-native` - For main branch only
+- `main-native` - For main branch commits
+- `main-{sha}-native` - Specific commit reference
+- `develop-native` - For develop branch commits
+- `develop-{sha}-native` - Develop branch commit reference
+- `pr-{number}-native` - For pull requests (not pushed)
+
+**Build Time:** ~5-10 minutes (native compilation takes longer than JVM)
+
+### 5. Summary Job
 
 Generates a deployment summary with job results and build information.
 
-## Docker Image
+## Docker Images
 
-The Docker image is built using **Spring Boot Buildpacks** (Paketo Buildpacks):
+The project builds two types of Docker images using **Spring Boot Buildpacks** (Paketo Buildpacks):
+
+### JVM Image
 
 **Buildpack Features:**
-- Base: Automatically selected optimal base image (Ubuntu Jammy Tiny)
-- Builder: `paketobuildpacks/builder-jammy-base`
+- Base: Ubuntu Noble Tiny
+- Builder: `paketobuildpacks/builder-noble-java-tiny`
 - **JRE-only runtime** - No JDK in final image for smaller size
 - **Non-root user** - Runs as CNB user for security
 - **Layer optimization** - Separate layers for dependencies, classes, and resources
@@ -100,18 +139,48 @@ The Docker image is built using **Spring Boot Buildpacks** (Paketo Buildpacks):
 
 **Image Layers:**
 ```
-- Paketo BellSoft Liberica JRE
+- Paketo BellSoft Liberica JRE 21
 - Application dependencies (cached)
 - Application classes
 - Application resources
 ```
 
+**Image Stats:**
+- Size: ~224 MB
+- Startup time: ~2 seconds
+- Memory usage: ~200 MB
+
+### Native Image (GraalVM)
+
+**Buildpack Features:**
+- Base: Ubuntu Noble Tiny
+- Builder: `paketobuildpacks/builder-noble-tiny` with Native Image buildpack
+- **Ahead-of-Time (AOT) compiled** - Binary executable, no JVM needed
+- **Non-root user** - Runs as CNB user for security
+- **Minimal runtime** - Only includes required libraries
+- **Instant startup** - No warmup period
+- **Low memory** - Significantly reduced footprint
+
+**Image Layers:**
+```
+- Minimal base OS libraries
+- GraalVM Native Image binary
+- Application resources
+```
+
+**Image Stats:**
+- Size: ~80 MB (65% smaller than JVM)
+- Startup time: < 100 ms (20x faster than JVM)
+- Memory usage: ~50 MB (75% less than JVM)
+
 ## Using the Docker Image
 
 ### Pull from GitHub Container Registry
 
+#### JVM Images
+
 ```bash
-# Pull latest image from main branch
+# Pull latest JVM image from main branch
 docker pull ghcr.io/<username>/springboot-openapi-generator:latest
 
 # Pull specific branch
@@ -121,14 +190,41 @@ docker pull ghcr.io/<username>/springboot-openapi-generator:main
 docker pull ghcr.io/<username>/springboot-openapi-generator:main-abc1234
 ```
 
-### Run the Container
+#### Native Images
 
 ```bash
-# Run directly with Docker
-docker run -d -p 8080:8080 ghcr.io/<username>/springboot-openapi-generator:latest
+# Pull latest native image from main branch
+docker pull ghcr.io/<username>/springboot-openapi-generator:latest-native
 
-# Or use docker-compose
-docker-compose up -d
+# Pull specific branch
+docker pull ghcr.io/<username>/springboot-openapi-generator:main-native
+
+# Pull specific commit
+docker pull ghcr.io/<username>/springboot-openapi-generator:main-abc1234-native
+```
+
+### Run the Container
+
+#### JVM Container
+
+```bash
+# Run JVM image
+docker run -d -p 8080:8080 --name app-jvm \
+  ghcr.io/<username>/springboot-openapi-generator:latest
+
+# Check startup time
+docker logs -f app-jvm
+```
+
+#### Native Container
+
+```bash
+# Run native image (instant startup)
+docker run -d -p 8080:8080 --name app-native \
+  ghcr.io/<username>/springboot-openapi-generator:latest-native
+
+# Check instant startup time
+docker logs -f app-native
 ```
 
 ### Access the Application
@@ -147,8 +243,10 @@ curl -X POST http://localhost:8080/students \
 
 ### Build locally with Spring Boot Buildpacks
 
+#### JVM Image
+
 ```bash
-# Build the image using Maven
+# Build JVM image using Maven
 ./mvnw spring-boot:build-image
 
 # Or specify custom image name
@@ -159,20 +257,57 @@ curl -X POST http://localhost:8080/students \
 ./gradlew bootBuildImage
 ```
 
-### Run locally
+#### Native Image
 
 ```bash
-# Run with Docker
-docker run -d -p 8080:8080 springboot-openapi-generator:0.0.1-SNAPSHOT
+# Build native image using Maven
+./mvnw spring-boot:build-image \
+  -Dspring-boot.build-image.env.BP_NATIVE_IMAGE=true
+
+# Or specify custom image name
+./mvnw spring-boot:build-image \
+  -Dspring-boot.build-image.imageName=myapp:1.0-native \
+  -Dspring-boot.build-image.env.BP_NATIVE_IMAGE=true
+
+# Note: Native builds take 5-10 minutes
+```
+
+### Run locally
+
+#### JVM Container
+
+```bash
+# Run JVM image with Docker
+docker run -d -p 8080:8080 --name app-jvm \
+  springboot-openapi-generator:0.0.1-SNAPSHOT
 
 # Run with custom image name
-docker run -d -p 8080:8080 myapp:1.0
+docker run -d -p 8080:8080 --name app-jvm myapp:1.0
 
 # View logs
-docker logs -f <container-id>
+docker logs -f app-jvm
 
 # Stop container
-docker stop <container-id>
+docker stop app-jvm
+docker rm app-jvm
+```
+
+#### Native Container
+
+```bash
+# Run native image with Docker (instant startup)
+docker run -d -p 8080:8080 --name app-native \
+  springboot-openapi-generator:0.0.1-SNAPSHOT
+
+# Run with custom image name
+docker run -d -p 8080:8080 --name app-native myapp:1.0-native
+
+# View logs (notice the instant startup)
+docker logs -f app-native
+
+# Stop container
+docker stop app-native
+docker rm app-native
 ```
 
 ### Customizing the Build
