@@ -9,8 +9,8 @@ group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 
 ext {
-    BP_SPRING_AOT_ENABLED = 'false'
-    BP_JVM_CDS_ENABLED = 'false'
+    BP_SPRING_AOT_ENABLED = 'true'
+    BP_JVM_CDS_ENABLED = 'true'
     BP_JVM_VERSION = '21'
     BP_NATIVE_IMAGE = 'false'
 }

@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.example</groupId>
 	<artifactId>springboot-openapi-generator</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.2-SNAPSHOT</version>
 	<name>springboot-openapi-generator</name>
 	<description>Projeto de example de como utilizar o Openapi Generator</description>
 
