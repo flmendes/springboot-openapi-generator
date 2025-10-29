@@ -12,6 +12,7 @@ ext {
     BP_SPRING_AOT_ENABLED = 'false'
     BP_JVM_CDS_ENABLED = 'false'
     BP_JVM_VERSION = '21'
+    BP_NATIVE_IMAGE = 'false'
 }
 
 
@@ -73,7 +74,8 @@ tasks.bootBuildImage {
     environment = [
             BP_SPRING_AOT_ENABLED : BP_SPRING_AOT_ENABLED,
             BP_JVM_CDS_ENABLED    : BP_JVM_CDS_ENABLED,
-            BP_JVM_VERSION        : BP_JVM_VERSION
+            BP_JVM_VERSION        : BP_JVM_VERSION,
+            BP_NATIVE_IMAGE       : BP_NATIVE_IMAGE
     ]
 }
 
