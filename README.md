@@ -96,7 +96,7 @@ Containerização sem Dockerfile usando Spring Boot Buildpacks:
 1. **Clone o repositório**
 
 ```bash
-git clone https://github.com/<seu-usuario>/springboot-openapi-generator.git
+git clone https://github.com/<flmendes>/springboot-openapi-generator.git
 cd springboot-openapi-generator
 ```
 
@@ -474,7 +474,7 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 ## 👥 Autores
 
-- **Seu Nome** - *Trabalho Inicial* - [GitHub](https://github.com/seu-usuario)
+- **Flávio Mendes** - *Trabalho Inicial* - [GitHub](https://github.com/flmendes)
 
 ## 🙏 Agradecimentos
 
@@ -486,8 +486,8 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 ## 📞 Suporte
 
 - 📫 Email: seu-email@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/seu-usuario/springboot-openapi-generator/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/seu-usuario/springboot-openapi-generator/discussions)
+- 🐛 Issues: [GitHub Issues](https://github.com/flmendes/springboot-openapi-generator/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/flmendes/springboot-openapi-generator/discussions)
 
 ---
 
