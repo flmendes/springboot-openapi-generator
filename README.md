@@ -485,7 +485,6 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 ## 📞 Suporte
 
-- 📫 Email: seu-email@example.com
 - 🐛 Issues: [GitHub Issues](https://github.com/flmendes/springboot-openapi-generator/issues)
 - 💬 Discussions: [GitHub Discussions](https://github.com/flmendes/springboot-openapi-generator/discussions)
 
