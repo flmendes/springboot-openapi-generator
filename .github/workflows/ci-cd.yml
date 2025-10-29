@@ -1,0 +1,219 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  JAVA_VERSION: '21'
+  JAVA_DISTRIBUTION: 'temurin'
+
+jobs:
+  test:
+    name: Test Application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          cache: 'maven'
+
+      - name: Run tests
+        run: ./mvnw clean test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: target/surefire-reports/
+          retention-days: 7
+
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          cache: 'maven'
+
+      - name: Build application
+        run: ./mvnw clean package -DskipTests
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-jar
+          path: target/*.jar
+          retention-days: 7
+
+  build-and-push-image:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          cache: 'maven'
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        run: |
+          # Determine image tags based on branch/event
+          IMAGE_BASE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          TAGS=""
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TAGS="${IMAGE_BASE}:pr-${{ github.event.pull_request.number }}"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            TAGS="${IMAGE_BASE}:latest,${IMAGE_BASE}:main,${IMAGE_BASE}:main-${{ github.sha }}"
+          else
+            TAGS="${IMAGE_BASE}:${{ github.ref_name }},${IMAGE_BASE}:${{ github.ref_name }}-${{ github.sha }}"
+          fi
+
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "Image tags: ${TAGS}"
+
+      - name: Build Docker image with Spring Boot Buildpacks
+        run: |
+          # Get the first tag for building
+          PRIMARY_TAG=$(echo "${{ steps.meta.outputs.tags }}" | cut -d',' -f1)
+          echo "Building image with tag: ${PRIMARY_TAG}"
+
+          # Build image using Spring Boot Buildpacks
+          ./mvnw spring-boot:build-image \
+            -Dspring-boot.build-image.imageName=${PRIMARY_TAG} \
+            -DskipTests
+
+          # Tag with additional tags
+          IFS=',' read -ra TAGS_ARRAY <<< "${{ steps.meta.outputs.tags }}"
+          for tag in "${TAGS_ARRAY[@]:1}"; do
+            echo "Tagging image: ${tag}"
+            docker tag ${PRIMARY_TAG} ${tag}
+          done
+
+      - name: Test Docker image
+        run: |
+          # Get the first tag from the metadata output
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | cut -d',' -f1)
+          echo "Testing image: ${IMAGE_TAG}"
+
+          # Run container in detached mode
+          CONTAINER_ID=$(docker run -d -p 8080:8080 "${IMAGE_TAG}")
+          echo "Container ID: ${CONTAINER_ID}"
+
+          # Wait for application to start (max 60 seconds)
+          echo "Waiting for application to start..."
+          for i in {1..30}; do
+            if curl -f -s http://localhost:8080/actuator/health > /dev/null 2>&1; then
+              echo "Application is healthy!"
+              docker logs "${CONTAINER_ID}"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Application failed to start within timeout"
+              docker logs "${CONTAINER_ID}"
+              docker stop "${CONTAINER_ID}"
+              docker rm "${CONTAINER_ID}"
+              exit 1
+            fi
+            echo "Attempt $i/30 - waiting..."
+            sleep 2
+          done
+
+          # Cleanup
+          docker stop "${CONTAINER_ID}"
+          docker rm "${CONTAINER_ID}"
+
+      - name: Push Docker images
+        if: github.event_name != 'pull_request'
+        run: |
+          # Push all tags
+          IFS=',' read -ra TAGS_ARRAY <<< "${{ steps.meta.outputs.tags }}"
+          for tag in "${TAGS_ARRAY[@]}"; do
+            echo "Pushing image: ${tag}"
+            docker push "${tag}"
+          done
+
+      - name: Generate image summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "### Docker Images Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Built with Spring Boot Buildpacks (Cloud Native)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          IFS=',' read -ra TAGS_ARRAY <<< "${{ steps.meta.outputs.tags }}"
+          for tag in "${TAGS_ARRAY[@]}"; do
+            echo "- \`docker pull ${tag}\`" >> $GITHUB_STEP_SUMMARY
+          done
+
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [test, build, build-and-push-image]
+    if: always()
+
+    steps:
+      - name: Create summary
+        run: |
+          echo "## CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Test: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build & Push Image: ${{ needs.build-and-push-image.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "- Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Actor: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Java Version: ${{ env.JAVA_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "### Docker Image" >> $GITHUB_STEP_SUMMARY
+            echo "```" >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "```" >> $GITHUB_STEP_SUMMARY
+          fi

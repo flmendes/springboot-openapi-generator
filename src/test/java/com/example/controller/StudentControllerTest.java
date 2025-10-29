@@ -112,18 +112,20 @@ class StudentControllerTest {
     void createStudent_ShouldReturnConflict_WhenEmailAlreadyExists() throws Exception {
         // Given
         StudentRequest request = new StudentRequest("John Doe", "john.doe@email.com", "(11) 99999-9999");
-        
+
         when(studentService.createStudent(any(StudentRequest.class)))
                 .thenThrow(new EmailAlreadyExistsException("Email already exists"));
 
-        // When & Then
+        // When & Then - RFC 7807 Problem Details format
         mockMvc.perform(post("/students")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.error").value("Email already exists"))
-                .andExpect(jsonPath("$.message").value("Email already exists"));
+                .andExpect(content().contentType("application/problem+json"))
+                .andExpect(jsonPath("$.type").value("https://api.example.com/errors/email-already-exists"))
+                .andExpect(jsonPath("$.title").value("Email Already Exists"))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.detail").value("Email already exists"));
     }
 
     @Test
@@ -136,14 +138,12 @@ class StudentControllerTest {
     }
 
     @Test
-    void createStudent_ShouldReturnInternalServerError_WhenRequestBodyIsInvalid() throws Exception {
-        // When & Then - Invalid JSON returns 500 due to JSON parsing error
+    void createStudent_ShouldReturnBadRequest_WhenRequestBodyIsInvalid() throws Exception {
+        // When & Then - Invalid JSON returns 400 with RFC 7807 Problem Details
         mockMvc.perform(post("/students")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("invalid json"))
-                .andExpect(status().isInternalServerError())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.error").value("Internal Server Error"))
-                .andExpect(jsonPath("$.message").value("An unexpected error occurred"));
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType("application/problem+json"));
     }
 }
